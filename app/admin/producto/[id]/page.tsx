@@ -3,10 +3,9 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { CircleAlert, Pencil, Save, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
-// =========================================================================
-// PALETA NEUMÓRFICA (coincide con el catálogo y admin)
-// =========================================================================
 const PALETTE = {
   bg: '#E0E5EC',
   bgCard: '#E8EDF2',
@@ -23,15 +22,9 @@ const PALETTE = {
   border: 'rgba(163, 177, 198, 0.3)',
 };
 
-// =========================================================================
-// CLIENT COMPONENT
-// =========================================================================
 export default function EditarProducto({ params }: { params: Promise<{ id: string }> }) {
-  // ✅ Desenvolver params con React.use()
   const { id } = use(params)
-  
-  console.log('🔍 ID del producto a editar:', id)
-  
+
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [cargandoDatos, setCargandoDatos] = useState(true)
@@ -44,30 +37,22 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
     status: 'Nuevo',
     label: '',
     badge: '',
-    fallbackIcon: '🎸',
   })
 
-  // ✅ Usar id correctamente
   useEffect(() => {
     const loadProduct = async () => {
       try {
-        console.log('🔄 Cargando producto...')
         setError(null)
         
         const url = `/api/productos/${id}`
-        console.log('📡 URL de la API:', url)
-        
         const response = await fetch(url)
-        console.log('📡 Status de respuesta:', response.status)
         
         if (!response.ok) {
           const errorData = await response.json()
-          console.error('❌ Error de API:', errorData)
           throw new Error(errorData.error || `Error ${response.status}`)
         }
         
         const data = await response.json()
-        console.log('✅ Producto cargado:', data)
         
         setFormData({
           name: data.name,
@@ -77,7 +62,6 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
           status: data.status,
           label: data.label || '',
           badge: data.badge || '',
-          fallbackIcon: data.fallbackIcon || '🎸',
         })
       } catch (error) {
         console.error('❌ Error al cargar producto:', error)
@@ -87,13 +71,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
       }
     }
     
-    if (id) {
-      loadProduct()
-    } else {
-      console.warn('⚠️ No hay ID disponible')
-      setError('ID de producto no válido')
-      setCargandoDatos(false)
-    }
+    loadProduct()
   }, [id])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,14 +96,13 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
         const errorData = await response.json()
         alert(`Error al actualizar: ${errorData.error || 'Error desconocido'}`)
       }
-    } catch (error) {
+    } catch {
       alert('Error de conexión')
     } finally {
       setLoading(false)
     }
   }
 
-  // Mostrar estado de carga
   if (cargandoDatos) {
     return (
       <div style={{
@@ -148,7 +125,6 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
     )
   }
 
-  // Mostrar error
   if (error) {
     return (
       <div style={{
@@ -169,7 +145,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
           boxShadow: '8px 8px 16px #A3B1C6, -8px -8px 16px #FFFFFF',
           maxWidth: '500px',
         }}>
-          <span style={{ fontSize: '4rem' }}>😕</span>
+          <CircleAlert size={48} aria-hidden="true" />
           <h2 style={{ color: PALETTE.textPrimary }}>Error al cargar el producto</h2>
           <p style={{ color: PALETTE.textSecondary }}>{error}</p>
           <p style={{ fontSize: '0.8rem', color: PALETTE.textMuted, marginTop: '10px' }}>
@@ -196,7 +172,6 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
       alignItems: 'center',
     }}>
       
-      {/* Estilos globales neumórficos */}
       <style>{`
         .neu-card {
           background: ${PALETTE.bgCard};
@@ -291,8 +266,9 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
         
         .neu-btn-cancel {
           width: 100%;
-          background: ${PALETTE.bgCard};
-          box-shadow: 4px 4px 8px ${PALETTE.shadowDark}, -4px -4px 8px ${PALETTE.shadowLight};
+          background: ${PALETTE.red};
+          color: white;
+          box-shadow: none;
         }
         
         .neu-label {
@@ -325,15 +301,13 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
         }
       `}</style>
 
-      {/* Contenedor del formulario */}
       <div className="neu-card" style={{
         padding: '40px',
         maxWidth: '600px',
         width: '100%',
       }}>
         
-        {/* Header del formulario */}
-        <div style={{ 
+        <div style={{
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
@@ -348,7 +322,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               fontWeight: '800',
               color: PALETTE.textPrimary,
             }}>
-              ✏️ Editar Producto
+              <Pencil size={20} aria-hidden="true" /> Editar Producto
             </h1>
             <p style={{ 
               margin: '4px 0 0 0', 
@@ -363,19 +337,17 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               padding: '8px 16px',
               fontSize: '0.85rem',
             }}>
-              ✖ Cancelar
+              <X size={16} aria-hidden="true" /> Cancelar
             </button>
           </Link>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={handleSubmit}>
-          {/* Nombre */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label neu-label-required">
               Nombre del Producto
             </label>
-            <input
+            <Input
               type="text"
               required
               placeholder="Ej: Fender Stratocaster"
@@ -385,7 +357,6 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
             />
           </div>
 
-          {/* Categoría - ACTUALIZADA con Accesorios */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label neu-label-required">
               Categoría
@@ -395,17 +366,16 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="neu-select"
             >
-              <option value="guitarras">🎸 Guitarras</option>
-              <option value="pedales">🎛️ Pedales</option>
-              <option value="cuerdas">〰️ Cuerdas</option>
-              <option value="cables">🔌 Cables</option>
-              <option value="correas">🎗️ Correas</option>
-              <option value="accesorios">🎧 Accesorios</option> {/* ✅ NUEVO */}
+              <option value="guitarras">Guitarras</option>
+              <option value="pedales">Pedales</option>
+              <option value="cuerdas">Cuerdas</option>
+              <option value="cables">Cables</option>
+              <option value="correas">Correas</option>
+              <option value="accesorios">Accesorios</option>
             </select>
           </div>
 
-          {/* Precios */}
-          <div style={{ 
+          <div style={{
             display: 'grid', 
             gridTemplateColumns: '1fr 1fr', 
             gap: '16px', 
@@ -415,7 +385,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               <label className="neu-label neu-label-required">
                 Precio
               </label>
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 required
@@ -429,7 +399,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               <label className="neu-label">
                 Precio Original
               </label>
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
@@ -448,7 +418,6 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* Estado */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label">
               Estado
@@ -458,18 +427,17 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               className="neu-select"
             >
-              <option value="Nuevo">🆕 Nuevo</option>
-              <option value="Segunda mano - Impecable">🔄 Segunda mano - Impecable</option>
-              <option value="Segunda mano">🔄 Segunda mano</option>
+              <option value="Nuevo">Nuevo</option>
+              <option value="Segunda mano - Impecable">Segunda mano - Impecable</option>
+              <option value="Segunda mano">Segunda mano</option>
             </select>
           </div>
 
-          {/* Badge (opcional) */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label">
               Badge (opcional)
             </label>
-            <input
+            <Input
               type="text"
               placeholder="Ej: Oferta, Outlet, Reacondicionado"
               value={formData.badge}
@@ -478,23 +446,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
             />
           </div>
 
-          {/* Icono */}
-          <div style={{ marginBottom: '24px' }}>
-            <label className="neu-label">
-              Icono (emoji)
-            </label>
-            <input
-              type="text"
-              placeholder="🎸"
-              value={formData.fallbackIcon}
-              onChange={(e) => setFormData({ ...formData, fallbackIcon: e.target.value })}
-              className="neu-input"
-              style={{ fontSize: '1.5rem' }}
-            />
-          </div>
-
-          {/* Botones de acción */}
-          <div style={{ 
+          <div style={{
             display: 'flex', 
             gap: '12px', 
             marginTop: '8px',
@@ -513,7 +465,7 @@ export default function EditarProducto({ params }: { params: Promise<{ id: strin
                   Guardando...
                 </>
               ) : (
-                '💾 Actualizar Producto'
+                <><Save size={16} aria-hidden="true" /> Actualizar Producto</>
               )}
             </button>
             <Link href="/admin" style={{ flex: 1 }}>

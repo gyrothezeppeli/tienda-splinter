@@ -1,26 +1,13 @@
-// ============================================
-// GENERADOR - Cliente de Prisma
-// ============================================
 generator client {
     provider = "prisma-client-js"
 }
 
-// ============================================
-// ORIGEN DE DATOS - PostgreSQL en Supabase
-// ============================================
 datasource db {
     provider  = "postgresql"
     url       = env("DATABASE_URL")
     directUrl = env("DIRECT_URL")
 }
 
-// ============================================
-// MODELOS
-// ============================================
-
-// --------------------------------------------------
-// 1. USUARIOS
-// --------------------------------------------------
 model Usuario {
     id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     email         String   @unique
@@ -30,7 +17,6 @@ model Usuario {
     creadoEn      DateTime @default(now()) @map("creado_en")
     actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     pedidos   Pedido[]
     favoritos Favorito[]
     resenas   Resena[]
@@ -39,9 +25,6 @@ model Usuario {
     @@map("usuarios")
 }
 
-// --------------------------------------------------
-// 2. PRODUCTOS
-// --------------------------------------------------
 model Producto {
     id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     name             String
@@ -60,23 +43,20 @@ model Producto {
     createdAt        DateTime @default(now()) @map("creado_en")
     updatedAt        DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     detallesPedido DetallePedido[]
     favoritos      Favorito[]
     resenas        Resena[]
     imagenes       ImagenProducto[]
-    categoria      Categoria?       @relation(fields: [categoriaId], references: [id])
-    categoriaId    String?          @db.Uuid
     carritoItems   CarritoItem[]
-    marca          Marca?           @relation(fields: [marcaId], references: [id])
-    marcaId        String?          @db.Uuid
+
+    categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+    categoriaId String?    @map("categoria_id") @db.Uuid
+    marca       Marca?     @relation(fields: [marcaId], references: [id])
+    marcaId     String?    @map("marca_id") @db.Uuid
 
     @@map("productos")
 }
 
-// --------------------------------------------------
-// 3. IMAGENES DE PRODUCTOS
-// --------------------------------------------------
 model ImagenProducto {
     id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     productoId  String   @map("producto_id") @db.Uuid
@@ -86,15 +66,11 @@ model ImagenProducto {
     orden       Int      @default(0)
     createdAt   DateTime @default(now()) @map("creado_en")
 
-    // Relaciones
     producto Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
     @@map("imagenes_producto")
 }
 
-// --------------------------------------------------
-// 4. CATEGORIAS
-// --------------------------------------------------
 model Categoria {
     id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     nombre      String   @unique
@@ -106,15 +82,11 @@ model Categoria {
     createdAt   DateTime @default(now()) @map("creado_en")
     updatedAt   DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     productos Producto[]
 
     @@map("categorias")
 }
 
-// --------------------------------------------------
-// 5. PEDIDOS
-// --------------------------------------------------
 model Pedido {
     id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     usuarioId    String    @map("usuario_id") @db.Uuid
@@ -135,16 +107,12 @@ model Pedido {
     createdAt    DateTime  @default(now()) @map("creado_en")
     updatedAt    DateTime  @updatedAt @map("actualizado_en")
 
-    // Relaciones
     usuario  Usuario         @relation(fields: [usuarioId], references: [id])
     detalles DetallePedido[]
 
     @@map("pedidos")
 }
 
-// --------------------------------------------------
-// 6. DETALLES DE PEDIDO
-// --------------------------------------------------
 model DetallePedido {
     id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     pedidoId       String   @map("pedido_id") @db.Uuid
@@ -155,23 +123,18 @@ model DetallePedido {
     subtotal       Float
     createdAt      DateTime @default(now()) @map("creado_en")
 
-    // Relaciones
     pedido   Pedido   @relation(fields: [pedidoId], references: [id])
     producto Producto @relation(fields: [productoId], references: [id])
 
     @@map("detalles_pedido")
 }
 
-// --------------------------------------------------
-// 7. FAVORITOS
-// --------------------------------------------------
 model Favorito {
     id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     usuarioId  String   @map("usuario_id") @db.Uuid
     productoId String   @map("producto_id") @db.Uuid
     createdAt  DateTime @default(now()) @map("creado_en")
 
-    // Relaciones
     usuario  Usuario  @relation(fields: [usuarioId], references: [id])
     producto Producto @relation(fields: [productoId], references: [id])
 
@@ -179,9 +142,6 @@ model Favorito {
     @@map("favoritos")
 }
 
-// --------------------------------------------------
-// 8. RESENAS (corregido: sin tilde)
-// --------------------------------------------------
 model Resena {
     id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     usuarioId    String   @map("usuario_id") @db.Uuid
@@ -193,16 +153,12 @@ model Resena {
     createdAt    DateTime @default(now()) @map("creado_en")
     updatedAt    DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     usuario  Usuario  @relation(fields: [usuarioId], references: [id])
     producto Producto @relation(fields: [productoId], references: [id])
 
     @@map("resenas")
 }
 
-// --------------------------------------------------
-// 9. CARRITO DE COMPRAS
-// --------------------------------------------------
 model Carrito {
     id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     usuarioId String?  @map("usuario_id") @db.Uuid
@@ -210,16 +166,12 @@ model Carrito {
     createdAt DateTime @default(now()) @map("creado_en")
     updatedAt DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     usuario Usuario?      @relation(fields: [usuarioId], references: [id])
     items   CarritoItem[]
 
     @@map("carritos")
 }
 
-// --------------------------------------------------
-// 10. ITEMS DEL CARRITO
-// --------------------------------------------------
 model CarritoItem {
     id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     carritoId  String   @map("carrito_id") @db.Uuid
@@ -228,16 +180,12 @@ model CarritoItem {
     createdAt  DateTime @default(now()) @map("creado_en")
     updatedAt  DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     carrito  Carrito  @relation(fields: [carritoId], references: [id], onDelete: Cascade)
     producto Producto @relation(fields: [productoId], references: [id])
 
     @@map("carrito_items")
 }
 
-// --------------------------------------------------
-// 11. MARCAS
-// --------------------------------------------------
 model Marca {
     id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     nombre      String   @unique
@@ -247,7 +195,6 @@ model Marca {
     createdAt   DateTime @default(now()) @map("creado_en")
     updatedAt   DateTime @updatedAt @map("actualizado_en")
 
-    // Relaciones
     productos Producto[]
 
     @@map("marcas")

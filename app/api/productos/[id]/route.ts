@@ -1,13 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
-// ✅ GET - Obtener un producto por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ← Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 🔑 CLAVE: Desenvolver params con await
     const { id } = await params
     
     console.log('🔍 API GET - Buscando producto:', id)
@@ -41,13 +39,12 @@ export async function GET(
   }
 }
 
-// ✅ PUT - Actualizar un producto
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ← Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ← await
+    const { id } = await params
     const data = await request.json()
     
     console.log('🔄 API PUT - Actualizando:', id)
@@ -78,13 +75,12 @@ export async function PUT(
   }
 }
 
-// ✅ DELETE - Eliminar un producto
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }  // ← Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ← await
+    const { id } = await params
     
     console.log('🗑️ API DELETE - Eliminando:', id)
     

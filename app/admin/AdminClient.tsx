@@ -3,6 +3,19 @@
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Headphones,
+  Package,
+  PackagePlus,
+  Pencil,
+  RotateCcw,
+  Settings,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface Product {
   id: string
@@ -12,9 +25,6 @@ interface Product {
   status: string
 }
 
-// =========================================================================
-// PALETA NEUMÓRFICA (coincide con el catálogo)
-// =========================================================================
 const PALETTE = {
   bg: '#E0E5EC',
   bgCard: '#E8EDF2',
@@ -29,16 +39,6 @@ const PALETTE = {
   redHover: '#C53030',
   green: '#38A169',
   border: 'rgba(163, 177, 198, 0.3)',
-};
-
-// ✅ Mapa de íconos por categoría
-const CATEGORY_ICONS: Record<string, string> = {
-  'guitarras': '🎸',
-  'pedales': '🎛️',
-  'cuerdas': '〰️',
-  'cables': '🔌',
-  'correas': '🎗️',
-  'accesorios': '🎧',
 };
 
 export default function AdminClient({ productos }: { productos: Product[] }) {
@@ -58,16 +58,11 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
       } else {
         alert('Error al eliminar el producto')
       }
-    } catch (error) {
+    } catch {
       alert('Error de conexión')
     } finally {
       setDeletingId(null)
     }
-  }
-
-  // ✅ Función para obtener el ícono de la categoría
-  const getCategoryIcon = (category: string) => {
-    return CATEGORY_ICONS[category] || '📦'
   }
 
   return (
@@ -78,7 +73,6 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
       padding: '30px 6%',
     }}>
       
-      {/* Estilos globales neumórficos */}
       <style>{`
         .neu-card {
           background: ${PALETTE.bgCard};
@@ -185,7 +179,7 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
         }
         
         .neu-icon-btn {
-          background: transparent;
+          background: ${PALETTE.bgCard};
           border: none;
           cursor: pointer;
           font-size: 1.2rem;
@@ -195,8 +189,9 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
         }
         
         .neu-icon-btn:hover {
-          background: ${PALETTE.bg};
-          box-shadow: inset 2px 2px 4px ${PALETTE.shadowDark}, inset -2px -2px 4px ${PALETTE.shadowLight};
+          background: ${PALETTE.accent};
+          color: white;
+          box-shadow: none;
         }
         
         .loading-spinner {
@@ -215,7 +210,6 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
         }
       `}</style>
 
-      {/* Header */}
       <header style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -244,7 +238,7 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
             fontWeight: '800',
             color: PALETTE.textPrimary,
           }}>
-            ⚙️ Administrar Productos
+            <Settings size={22} aria-hidden="true" /> Administrar Productos
           </h1>
           <p style={{ 
             color: PALETTE.textSecondary,
@@ -254,17 +248,18 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
             {productos.length} productos en total
           </p>
         </div>
-        <Link href="/admin/nuevo">
-          <button className="neu-btn neu-btn-primary" style={{
+        <Button
+          className="neu-btn neu-btn-primary"
+          style={{
             padding: '12px 28px',
             fontSize: '0.9rem',
-          }}>
-            ➕ Nuevo Producto
-          </button>
-        </Link>
+          }}
+          onClick={() => router.push('/admin/nuevo')}
+        >
+          <PackagePlus size={18} aria-hidden="true" /> Nuevo Producto
+        </Button>
       </header>
 
-      {/* Tabla de productos */}
       <div className="neu-card" style={{
         overflow: 'hidden',
         padding: '4px 0',
@@ -287,7 +282,7 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
                   padding: '60px 20px',
                   color: PALETTE.textMuted,
                 }}>
-                  <span style={{ fontSize: '3rem', display: 'block', marginBottom: '12px' }}>📦</span>
+                  <Package size={48} style={{ display: 'block', margin: '0 auto 12px' }} aria-hidden="true" />
                   No hay productos registrados aún
                 </td>
               </tr>
@@ -299,16 +294,16 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
                   </td>
                   <td>
                     <span className="neu-pill">
-                      {getCategoryIcon(producto.category)} {producto.category}
+                      <CategoryIcon category={producto.category} size={15} /> {producto.category}
                     </span>
                   </td>
                   <td style={{ fontWeight: '700' }}>
                     ${producto.price.toFixed(2)}
                   </td>
                   <td>
-                    <span className={`neu-pill ${producto.status === 'Nuevo' ? 'neu-pill-green' : 'neu-pill-red'}`}>
+                    <Badge variant="secondary" className={`neu-pill ${producto.status === 'Nuevo' ? 'neu-pill-green' : 'neu-pill-red'}`}>
                       {producto.status}
-                    </span>
+                    </Badge>
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <div style={{
@@ -318,7 +313,7 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
                     }}>
                       <Link href={`/admin/producto/${producto.id}`}>
                         <button className="neu-icon-btn" title="Editar">
-                          ✏️
+                          <Pencil size={17} aria-hidden="true" />
                         </button>
                       </Link>
                       <button
@@ -335,7 +330,7 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
                         {deletingId === producto.id ? (
                           <span className="loading-spinner" />
                         ) : (
-                          '🗑️'
+                          <Trash2 size={17} aria-hidden="true" />
                         )}
                       </button>
                     </div>
@@ -347,7 +342,6 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
         </table>
       </div>
 
-      {/* Pie de página con estadísticas */}
       <div style={{
         marginTop: '24px',
         display: 'flex',
@@ -365,14 +359,13 @@ export default function AdminClient({ productos }: { productos: Product[] }) {
         </div>
         <div style={{ display: 'flex', gap: '20px' }}>
           <span>
-            🆕 <strong>{productos.filter(p => p.status === 'Nuevo').length}</strong> nuevos
+            <Sparkles size={15} aria-hidden="true" /> <strong>{productos.filter(p => p.status === 'Nuevo').length}</strong> nuevos
           </span>
           <span>
-            🔄 <strong>{productos.filter(p => p.status !== 'Nuevo').length}</strong> usados
+            <RotateCcw size={15} aria-hidden="true" /> <strong>{productos.filter(p => p.status !== 'Nuevo').length}</strong> usados
           </span>
-          {/* ✅ Estadística de accesorios */}
           <span>
-            🎧 <strong>{productos.filter(p => p.category === 'accesorios').length}</strong> accesorios
+            <Headphones size={15} aria-hidden="true" /> <strong>{productos.filter(p => p.category === 'accesorios').length}</strong> accesorios
           </span>
         </div>
       </div>

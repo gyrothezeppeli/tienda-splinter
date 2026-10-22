@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
+import { Check, CirclePlus, LoaderCircle, Save, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 
-// =========================================================================
-// PALETA NEUMÓRFICA
-// =========================================================================
 const PALETTE = {
   bg: '#E0E5EC',
   bgCard: '#E8EDF2',
@@ -36,23 +36,19 @@ export default function NuevoProducto() {
     status: 'Nuevo',
     label: '',
     badge: '',
-    fallbackIcon: '🎸',
   })
 
-  // Estado para la imagen (archivo y URL temporal)
   const [imageFile, setImageFile] = useState<File | null>(null)
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar que sea una imagen
     if (!file.type.startsWith('image/')) {
       alert('Por favor, selecciona una imagen válida')
       return
     }
 
-    // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('La imagen no puede superar los 5MB')
       return
@@ -60,7 +56,6 @@ export default function NuevoProducto() {
 
     setImageFile(file)
     
-    // Crear URL para vista previa
     const reader = new FileReader()
     reader.onloadend = () => {
       setImagePreview(reader.result as string)
@@ -97,7 +92,6 @@ export default function NuevoProducto() {
     setLoading(true)
 
     try {
-      // 1. Crear el producto sin imagen
       const response = await fetch('/api/productos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +99,7 @@ export default function NuevoProducto() {
           ...formData,
           price: parseFloat(formData.price),
           originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
-          image: null, // Temporalmente null
+          image: null,
         }),
       })
 
@@ -119,13 +113,11 @@ export default function NuevoProducto() {
       const producto = await response.json()
       let imageUrl = null
 
-      // 2. Subir la imagen si existe
       if (imageFile) {
         setUploadingImage(true)
         imageUrl = await uploadImage(producto.id)
         setUploadingImage(false)
 
-        // 3. Actualizar el producto con la URL de la imagen
         if (imageUrl) {
           await fetch(`/api/productos/${producto.id}`, {
             method: 'PUT',
@@ -163,7 +155,6 @@ export default function NuevoProducto() {
       alignItems: 'center',
     }}>
       
-      {/* Estilos globales neumórficos */}
       <style>{`
         .neu-card {
           background: ${PALETTE.bgCard};
@@ -258,8 +249,9 @@ export default function NuevoProducto() {
         
         .neu-btn-cancel {
           width: 100%;
-          background: ${PALETTE.bgCard};
-          box-shadow: 4px 4px 8px ${PALETTE.shadowDark}, -4px -4px 8px ${PALETTE.shadowLight};
+          background: ${PALETTE.red};
+          color: white;
+          box-shadow: none;
         }
         
         .neu-label {
@@ -301,15 +293,13 @@ export default function NuevoProducto() {
         }
       `}</style>
 
-      {/* Contenedor del formulario */}
       <div className="neu-card" style={{
         padding: '40px',
         maxWidth: '600px',
         width: '100%',
       }}>
         
-        {/* Header */}
-        <div style={{ 
+        <div style={{
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
@@ -324,7 +314,7 @@ export default function NuevoProducto() {
               fontWeight: '800',
               color: PALETTE.textPrimary,
             }}>
-              ➕ Nuevo Producto
+              <CirclePlus size={22} aria-hidden="true" /> Nuevo Producto
             </h1>
             <p style={{ 
               margin: '4px 0 0 0', 
@@ -339,19 +329,17 @@ export default function NuevoProducto() {
               padding: '8px 16px',
               fontSize: '0.85rem',
             }}>
-              ✖ Cancelar
+              <X size={16} aria-hidden="true" /> Cancelar
             </button>
           </Link>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={handleSubmit}>
-          {/* Nombre */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label neu-label-required">
               Nombre del Producto
             </label>
-            <input
+            <Input
               type="text"
               required
               placeholder="Ej: Fender Stratocaster"
@@ -361,7 +349,6 @@ export default function NuevoProducto() {
             />
           </div>
 
-          {/* Categoría - ACTUALIZADA con Accesorios */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label neu-label-required">
               Categoría
@@ -371,17 +358,16 @@ export default function NuevoProducto() {
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="neu-select"
             >
-              <option value="guitarras">🎸 Guitarras</option>
-              <option value="pedales">🎛️ Pedales</option>
-              <option value="cuerdas">〰️ Cuerdas</option>
-              <option value="cables">🔌 Cables</option>
-              <option value="correas">🎗️ Correas</option>
-              <option value="accesorios">🎧 Accesorios</option> {/* ✅ NUEVO */}
+              <option value="guitarras">Guitarras</option>
+              <option value="pedales">Pedales</option>
+              <option value="cuerdas">Cuerdas</option>
+              <option value="cables">Cables</option>
+              <option value="correas">Correas</option>
+              <option value="accesorios">Accesorios</option>
             </select>
           </div>
 
-          {/* Precios */}
-          <div style={{ 
+          <div style={{
             display: 'grid', 
             gridTemplateColumns: '1fr 1fr', 
             gap: '16px', 
@@ -391,7 +377,7 @@ export default function NuevoProducto() {
               <label className="neu-label neu-label-required">
                 Precio
               </label>
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 required
@@ -405,7 +391,7 @@ export default function NuevoProducto() {
               <label className="neu-label">
                 Precio Original
               </label>
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 placeholder="0.00"
@@ -424,7 +410,6 @@ export default function NuevoProducto() {
             </div>
           </div>
 
-          {/* Estado */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label">
               Estado
@@ -434,18 +419,17 @@ export default function NuevoProducto() {
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               className="neu-select"
             >
-              <option value="Nuevo">🆕 Nuevo</option>
-              <option value="Segunda mano - Impecable">🔄 Segunda mano - Impecable</option>
-              <option value="Segunda mano">🔄 Segunda mano</option>
+              <option value="Nuevo">Nuevo</option>
+              <option value="Segunda mano - Impecable">Segunda mano - Impecable</option>
+              <option value="Segunda mano">Segunda mano</option>
             </select>
           </div>
 
-          {/* Badge (opcional) */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label">
               Badge (opcional)
             </label>
-            <input
+            <Input
               type="text"
               placeholder="Ej: Oferta, Outlet, Reacondicionado"
               value={formData.badge}
@@ -454,12 +438,11 @@ export default function NuevoProducto() {
             />
           </div>
 
-          {/* Campo de Imagen */}
           <div style={{ marginBottom: '20px' }}>
             <label className="neu-label">
               Imagen del Producto
             </label>
-            <input
+            <Input
               type="file"
               accept="image/*"
               onChange={handleImageChange}
@@ -481,14 +464,17 @@ export default function NuevoProducto() {
                 fontSize: '0.85rem',
                 marginTop: '8px',
               }}>
-                ⏳ Subiendo imagen...
+                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> Subiendo imagen...
               </p>
             )}
             {imagePreview && (
               <div style={{ marginTop: '12px' }}>
-                <img 
+                <Image
                   src={imagePreview} 
                   alt="Vista previa" 
+                  width={640}
+                  height={480}
+                  unoptimized
                   className="image-preview"
                 />
                 <p style={{ 
@@ -496,28 +482,12 @@ export default function NuevoProducto() {
                   color: PALETTE.textMuted,
                   marginTop: '4px',
                 }}>
-                  ✅ Imagen seleccionada
+                  <Check size={14} aria-hidden="true" /> Imagen seleccionada
                 </p>
               </div>
             )}
           </div>
 
-          {/* Icono (fallback) */}
-          <div style={{ marginBottom: '24px' }}>
-            <label className="neu-label">
-              Icono (emoji) <span style={{ color: PALETTE.textMuted, fontWeight: '400' }}>(si no hay imagen)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="🎸"
-              value={formData.fallbackIcon}
-              onChange={(e) => setFormData({ ...formData, fallbackIcon: e.target.value })}
-              className="neu-input"
-              style={{ fontSize: '1.5rem' }}
-            />
-          </div>
-
-          {/* Botones */}
           <div style={{ 
             display: 'flex', 
             gap: '12px', 
@@ -537,7 +507,7 @@ export default function NuevoProducto() {
                   {uploadingImage ? 'Subiendo imagen...' : 'Guardando...'}
                 </>
               ) : (
-                '💾 Guardar Producto'
+                <><Save size={16} aria-hidden="true" /> Guardar Producto</>
               )}
             </button>
             <Link href="/admin" style={{ flex: 1 }}>

@@ -1,12 +1,29 @@
 "use client";
 
-import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import { startTransition, useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  Headphones,
+  Music2,
+  Pencil,
+  Search,
+  Settings,
+  Sparkles,
+  ShoppingCart,
+  UserRound,
+} from 'lucide-react'
 import type { Product } from './page'
+import { CategoryIcon } from '@/components/category-icon'
+import { useCart } from '@/lib/cart-context'
+import { useAuth } from '@/lib/auth-context'
+import { Input } from '@/components/ui/input'
 
-// =========================================================================
-// PALETA BASE CLARA NEUMÓRFICA CON DETALLES EN VERDE AGUA VIVO
-// =========================================================================
 const PALETTE = {
   bg: '#e0e5ec',
   shadowLight: '#ffffff',
@@ -18,41 +35,127 @@ const PALETTE = {
   
   aquaAccent: '#00b894',
   aquaSubtle: 'rgba(0, 184, 148, 0.12)',
-  btnGradient: 'linear-gradient(135deg, #00b894 0%, #00cec9 100%)',
+  btnColor: '#00b894',
 };
 
 const CATEGORY_FILTERS = [
   { id: "todos", label: "Todos" },
-  { id: "guitarras", label: "🎸 Guitarras" },
-  { id: "cuerdas", label: "〰️ Cuerdas" },
-  { id: "cables", label: "🔌 Cables" },
-  { id: "pedales", label: "🎛️ Pedales" },
-  { id: "correas", label: "🎗️ Correas" },
-  { id: "accesorios", label: "🎧 Accesorios" } // ✅ Nueva categoría
+  { id: "guitarras", label: "Guitarras" },
+  { id: "cuerdas", label: "Cuerdas" },
+  { id: "cables", label: "Cables" },
+  { id: "pedales", label: "Pedales" },
+  { id: "correas", label: "Correas" },
+  { id: "accesorios", label: "Accesorios" }
 ];
+
+function subscribeToWindowResize(callback: () => void) {
+  window.addEventListener('resize', callback)
+  return () => window.removeEventListener('resize', callback)
+}
+
+function getWindowWidth() {
+  return window.innerWidth
+}
+
+function getServerWindowWidth() {
+  return 1024
+}
 
 export default function CatalogClient({ products }: { products: Product[] }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("todos")
   const [searchTerm, setSearchTerm] = useState("")
+  const [heroProductIndex, setHeroProductIndex] = useState(0)
   const [favorites, setFavorites] = useState<{ [key: string]: boolean }>({})
-  const [isMounted, setIsMounted] = useState(false)
-  const [windowWidth, setWindowWidth] = useState(1024)
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({})
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null)
+  const { addToCart, itemCount } = useCart()
+  const { user, getAccessToken } = useAuth()
+  const router = useRouter()
+  const windowWidth = useSyncExternalStore(
+    subscribeToWindowResize,
+    getWindowWidth,
+    getServerWindowWidth
+  )
+
+  const isMobile = windowWidth < 768
+  const isTablet = windowWidth >= 768 && windowWidth < 1024
 
   useEffect(() => {
-    setIsMounted(true)
-    setWindowWidth(window.innerWidth)
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+    if (products.length < 2) return
 
-  const isMobile = isMounted ? windowWidth < 768 : false
-  const isTablet = isMounted ? (windowWidth >= 768 && windowWidth < 1024) : false
+    const intervalId = window.setInterval(() => {
+      setHeroProductIndex(index => (index + 1) % products.length)
+    }, 5000)
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
+    return () => window.clearInterval(intervalId)
+  }, [products.length])
+
+  useEffect(() => {
+    if (!recentlyAddedId) return
+    const timeoutId = window.setTimeout(() => setRecentlyAddedId(null), 1600)
+    return () => window.clearTimeout(timeoutId)
+  }, [recentlyAddedId])
+
+  useEffect(() => {
+    if (!user) {
+      startTransition(() => setFavorites({}))
+      return
+    }
+
+    let active = true
+    const loadFavorites = async () => {
+      try {
+        const token = await getAccessToken()
+        if (!token) return
+        const response = await fetch('/api/cuenta/favoritos', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'No se pudieron cargar los favoritos.')
+        if (active) {
+          setFavorites(Object.fromEntries(data.productIds.map((id: string) => [id, true])))
+        }
+      } catch (error) {
+        console.error('No se pudieron sincronizar los favoritos:', error)
+      }
+    }
+
+    void loadFavorites()
+    return () => { active = false }
+  }, [user, getAccessToken])
+
+  const handleAddToCart = (product: Product) => {
+    addToCart(product)
+    setRecentlyAddedId(product.id)
+  }
+
+  const toggleFavorite = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setFavorites(prev => ({ ...prev, [id]: !prev[id] }))
+    if (!user) {
+      router.push('/cuenta')
+      return
+    }
+
+    const wasFavorite = Boolean(favorites[id])
+    setFavorites(prev => ({ ...prev, [id]: !wasFavorite }))
+    try {
+      const token = await getAccessToken()
+      if (!token) throw new Error('Tu sesión expiró. Inicia sesión de nuevo.')
+      const response = await fetch('/api/cuenta/favoritos', {
+        method: wasFavorite ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productId: id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'No se pudo actualizar el favorito.')
+    } catch (error) {
+      setFavorites(prev => ({ ...prev, [id]: wasFavorite }))
+      console.error('No se pudo actualizar el favorito:', error)
+      window.alert(error instanceof Error ? error.message : 'No se pudo actualizar el favorito.')
+    }
   }
 
   const handleImageError = (id: string) => {
@@ -65,14 +168,11 @@ export default function CatalogClient({ products }: { products: Product[] }) {
     return matchesCategory && matchesSearch
   })
 
-  // ✅ Accesorios destacados (productos con categoría 'accesorios')
   const accesoriosDestacados = products.filter(product => 
     product.category === 'accesorios'
   )
-
-  if (!isMounted) {
-    return <div style={{ background: PALETTE.bg, minHeight: '100vh' }} />
-  }
+  const latestProducts = products.slice(0, 3)
+  const heroProduct = products[heroProductIndex] ?? products[0]
 
   if (products.length === 0) {
     return (
@@ -94,7 +194,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
           textAlign: 'center',
           boxShadow: `9px 9px 18px ${PALETTE.shadowDark}, -9px -9px 18px ${PALETTE.shadowLight}`,
         }}>
-          <span style={{ fontSize: '4rem' }}>🎵</span>
+          <Music2 size={64} strokeWidth={1.5} aria-hidden="true" />
           <h1 style={{ color: PALETTE.textPrimary, margin: '20px 0 10px' }}>¡Bienvenido a SonicLab!</h1>
           <p style={{ color: PALETTE.textSecondary }}>
             No hay productos aún. <br />
@@ -116,7 +216,6 @@ export default function CatalogClient({ products }: { products: Product[] }) {
       position: 'relative'
     }}>
       
-      {/* Estilos CSS globales */}
       <style>{`
         * {
           box-sizing: border-box;
@@ -229,7 +328,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
         }
 
         .neu-buy-btn {
-          background: ${PALETTE.btnGradient};
+          background: ${PALETTE.btnColor};
           border: none;
           border-radius: 25px;
           color: #FFFFFF;
@@ -282,13 +381,26 @@ export default function CatalogClient({ products }: { products: Product[] }) {
           user-select: none;
         }
 
-        /* ✅ Estilos para la sección de accesorios */
+        .new-arrival-card {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          min-width: 0;
+          padding: 20px;
+        }
+
+        @media (max-width: 767px) {
+          .new-arrival-card {
+            padding: 16px;
+          }
+        }
+
         .accesorios-banner {
           background: linear-gradient(135deg, ${PALETTE.aquaSubtle} 0%, ${PALETTE.aquaAccent}22 100%);
           border: 1px solid ${PALETTE.aquaAccent}33;
           border-radius: 20px;
-          padding: 24px 30px;
-          margin-bottom: 30px;
+          padding: 18px 22px;
+          margin-bottom: 20px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -298,7 +410,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
 
         .accesorios-banner h2 {
           margin: 0;
-          font-size: 1.2rem;
+          font-size: 1.05rem;
           font-weight: 800;
           color: ${PALETTE.textPrimary};
         }
@@ -318,10 +430,8 @@ export default function CatalogClient({ products }: { products: Product[] }) {
         }
       `}</style>
 
-      {/* Contenedor Principal */}
       <div style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* Header */}
         <header style={{
           paddingBottom: isMobile ? '20px' : '40px',
           marginBottom: '20px',
@@ -330,6 +440,8 @@ export default function CatalogClient({ products }: { products: Product[] }) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '14px',
             padding: isMobile ? '1rem' : '1.2rem 2.5rem',
             borderRadius: '24px',
             background: PALETTE.bg,
@@ -348,39 +460,104 @@ export default function CatalogClient({ products }: { products: Product[] }) {
               fontSize: isMobile ? '0.9rem' : '1.1rem',
             }}>
               <div className="neu-btn-circle" style={{ width: '36px', height: '36px', color: PALETTE.aquaAccent }}>
-                ♪
+                <Music2 size={20} aria-hidden="true" />
               </div>
               SONICLAB
             </div>
 
             {!isMobile && (
               <div style={{ display: 'flex', gap: '32px' }}>
-                <a href="#" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Equipos</a>
-                <a href="#" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Novedades</a>
-                <a href="#" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Soporte</a>
+                <a href="#productos" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Catálogo</a>
+                <a href="#novedades" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Novedades</a>
+                <a href="#accesorios" style={{ color: PALETTE.textSecondary, textDecoration: 'none', fontWeight: '600' }}>Accesorios</a>
               </div>
             )}
+
+            <div className="neu-input-container" style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              width: isMobile ? '100%' : 'min(30vw, 340px)',
+              order: isMobile ? 3 : 0,
+            }}>
+              <Search size={18} style={{ marginLeft: '16px', color: PALETTE.aquaAccent, flexShrink: 0 }} aria-hidden="true" />
+              <Input
+                type="search"
+                aria-label="Buscar productos"
+                placeholder="Buscar productos..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="neu-input"
+                style={{ padding: '12px 14px', fontSize: '0.85rem' }}
+              />
+            </div>
 
             <div>
               <Link href="/admin">
                 <button className="neu-btn-circle" style={{ 
                   width: isMobile ? '38px' : '44px',
                   height: isMobile ? '38px' : '44px',
-                  fontSize: isMobile ? '1rem' : '1.1rem',
                 }}>
-                  ⚙️
+                  <span className="sr-only">Administrar productos</span>
+                  <Settings size={20} aria-hidden="true" />
                 </button>
               </Link>
             </div>
+            <Link
+              href="/cuenta"
+              aria-label={user ? `Mi perfil, ${user.email}` : 'Iniciar sesión o crear cuenta'}
+              style={{
+                display: 'grid',
+                placeItems: 'center',
+                width: isMobile ? '38px' : '44px',
+                height: isMobile ? '38px' : '44px',
+                borderRadius: '50%',
+                color: PALETTE.textPrimary,
+                boxShadow: `4px 4px 9px ${PALETTE.shadowDark}, -4px -4px 9px ${PALETTE.shadowLight}`,
+              }}
+            >
+              <UserRound size={19} aria-hidden="true" />
+            </Link>
+            <Link
+              href="/carrito"
+              aria-label={`Abrir carrito, ${itemCount} ${itemCount === 1 ? 'producto' : 'productos'}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                borderRadius: '16px',
+                color: PALETTE.textPrimary,
+                textDecoration: 'none',
+                boxShadow: `4px 4px 9px ${PALETTE.shadowDark}, -4px -4px 9px ${PALETTE.shadowLight}`,
+                fontWeight: 700,
+              }}
+            >
+              <ShoppingCart size={19} aria-hidden="true" />
+              <span>Carrito</span>
+              <span aria-live="polite" style={{
+                display: 'grid',
+                placeItems: 'center',
+                minWidth: '22px',
+                height: '22px',
+                padding: '0 5px',
+                borderRadius: '99px',
+                background: PALETTE.aquaAccent,
+                color: 'white',
+                fontSize: '0.7rem',
+              }}>
+                {itemCount}
+              </span>
+            </Link>
           </nav>
 
-          {/* Hero */}
           <div className="neu-card" style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1.2fr 0.8fr',
+            gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr',
             padding: isMobile ? '1.8rem 1.2rem' : '3.5rem 3rem',
             alignItems: 'center',
-            gap: isMobile ? '25px' : '20px',
+            gap: isMobile ? '25px' : '40px',
+            overflow: 'hidden',
           }}>
             <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
               <div className="neu-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '1.2rem' }}>
@@ -395,8 +572,8 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                 margin: '0 0 1rem 0',
                 color: PALETTE.textPrimary,
               }}>
-                Sonido de alta precisión, <br />
-                <span style={{ color: PALETTE.aquaAccent }}>diseño impecable.</span>
+                Instrumentos para <br />
+                <span style={{ color: PALETTE.aquaAccent }}>encontrar tu sonido.</span>
               </h1>
 
               <p style={{
@@ -406,57 +583,174 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                 lineHeight: '1.6',
                 margin: '0 0 1.8rem 0'
               }}>
-                Explora el catálogo premium con las mejores herramientas analógicas y digitales, curadas especialmente para tu setup.
+                Explora instrumentos y accesorios seleccionados para acompañar cada idea, ensayo y escenario.
               </p>
 
-              <button className="neu-btn" style={{
+              <a href="#productos" className="neu-btn" style={{
                 padding: isMobile ? '12px 24px' : '14px 28px',
                 fontSize: '0.85rem',
                 width: isMobile ? '100%' : 'auto',
                 gap: '8px',
                 borderRadius: '25px',
-                color: PALETTE.aquaAccent
+                color: PALETTE.aquaAccent,
+                textDecoration: 'none',
               }}>
-                Explorar Catálogo <span>→</span>
-              </button>
+                Explorar Catálogo <ArrowRight size={16} aria-hidden="true" />
+              </a>
             </div>
 
             <div style={{
+              position: 'relative',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              minHeight: isMobile ? '220px' : '320px',
+              borderRadius: '24px',
+              background: `radial-gradient(circle at center, ${PALETTE.shadowLight} 0%, ${PALETTE.bg} 70%)`,
             }}>
-              <div className="neu-card" style={{
-                width: isMobile ? '140px' : '200px',
-                height: isMobile ? '140px' : '200px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: `inset 6px 6px 12px ${PALETTE.shadowDark}, inset -6px -6px 12px ${PALETTE.shadowLight}`
-              }}>
-                <div className="neu-btn-circle" style={{
-                  width: isMobile ? '90px' : '130px',
-                  height: isMobile ? '90px' : '130px',
-                  fontSize: isMobile ? '2.5rem' : '3.8rem',
-                  color: PALETTE.aquaAccent
+              {heroProduct?.image && !imageErrors[heroProduct.id] ? (
+                <Image
+                  src={heroProduct.image}
+                  alt={heroProduct.name}
+                  fill
+                  sizes="(max-width: 768px) 90vw, 40vw"
+                  className="product-image"
+                  unoptimized
+                  onError={() => handleImageError(heroProduct.id)}
+                  key={heroProduct.id}
+                  priority={heroProductIndex === 0}
+                />
+              ) : (
+                <CategoryIcon category={heroProduct?.category ?? 'todos'} size={isMobile ? 88 : 124} />
+              )}
+              {heroProduct && (
+                <div style={{
+                  position: 'absolute',
+                  left: isMobile ? '14px' : '24px',
+                  right: isMobile ? '14px' : '24px',
+                  bottom: isMobile ? '14px' : '24px',
+                  padding: '14px 18px',
+                  borderRadius: '18px',
+                  background: `${PALETTE.bg}eF`,
+                  boxShadow: `5px 5px 12px ${PALETTE.shadowDark}, -5px -5px 12px ${PALETTE.shadowLight}`,
                 }}>
-                  🎵
+                  <span style={{ color: PALETTE.aquaAccent, fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                    {heroProduct.category}
+                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginTop: '4px' }}>
+                    <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{heroProduct.name}</strong>
+                    <strong style={{ flexShrink: 0 }}>${heroProduct.price.toFixed(2)}</strong>
+                  </div>
                 </div>
-              </div>
+              )}
+              {products.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="neu-btn-circle"
+                    aria-label="Producto destacado anterior"
+                    onClick={() => setHeroProductIndex(index => (index - 1 + products.length) % products.length)}
+                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', zIndex: 2 }}
+                  >
+                    <ChevronLeft size={18} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="neu-btn-circle"
+                    aria-label="Siguiente producto destacado"
+                    onClick={() => setHeroProductIndex(index => (index + 1) % products.length)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', zIndex: 2 }}
+                  >
+                    <ChevronRight size={18} aria-hidden="true" />
+                  </button>
+                  <div aria-label={`Producto ${heroProductIndex + 1} de ${products.length}`} style={{ position: 'absolute', top: '14px', right: '14px', display: 'flex', gap: '6px', zIndex: 2 }}>
+                    {products.map((product, index) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        aria-label={`Mostrar ${product.name}`}
+                        aria-current={index === heroProductIndex ? 'true' : undefined}
+                        onClick={() => setHeroProductIndex(index)}
+                        style={{
+                          width: index === heroProductIndex ? '18px' : '8px',
+                          height: '8px',
+                          padding: 0,
+                          border: 0,
+                          borderRadius: '99px',
+                          background: index === heroProductIndex ? PALETTE.aquaAccent : `${PALETTE.textSecondary}88`,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
 
-        {/* ============================================================
-            ✅ SECCIÓN DE ACCESORIOS DESTACADOS
-            ============================================================ */}
+        {latestProducts.length > 0 && (
+          <section id="novedades" style={{ marginBottom: '36px', scrollMarginTop: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+              <Sparkles size={22} color={PALETTE.aquaAccent} aria-hidden="true" />
+              <h2 style={{ margin: 0, fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 800 }}>Recién ingresados</h2>
+              <span className="neu-badge" style={{ marginLeft: 'auto' }}>NOVEDADES</span>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : `repeat(${latestProducts.length}, minmax(0, 1fr))`,
+              gap: '18px',
+            }}>
+              {latestProducts.map((product) => (
+                <article key={`new-${product.id}`} className="neu-card new-arrival-card">
+                  <div style={{
+                    position: 'relative',
+                    width: isMobile ? '84px' : '104px',
+                    height: isMobile ? '84px' : '104px',
+                    flexShrink: 0,
+                    display: 'grid',
+                    placeItems: 'center',
+                    borderRadius: '16px',
+                    background: PALETTE.bg,
+                    boxShadow: `inset 3px 3px 7px ${PALETTE.shadowDark}, inset -3px -3px 7px ${PALETTE.shadowLight}`,
+                    overflow: 'hidden',
+                  }}>
+                    {product.image && !imageErrors[product.id] ? (
+                      <Image
+                        src={product.image}
+                        alt=""
+                        fill
+                        sizes="104px"
+                        style={{ objectFit: 'contain', padding: '6px' }}
+                        unoptimized
+                        onError={() => handleImageError(product.id)}
+                      />
+                    ) : (
+                      <CategoryIcon category={product.category} size={30} />
+                    )}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ color: PALETTE.aquaAccent, fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                      {product.category}
+                    </span>
+                    <h3 style={{ margin: '5px 0', fontSize: isMobile ? '0.98rem' : '1.08rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {product.name}
+                    </h3>
+                    <strong style={{ fontSize: '0.92rem' }}>${product.price.toFixed(2)}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         {accesoriosDestacados.length > 0 && (
-          <section style={{ marginBottom: '40px' }}>
+          <section id="accesorios" style={{ marginBottom: '40px', scrollMarginTop: '24px' }}>
             <div className="accesorios-banner">
               <div>
                 <h2>
-                  🎧 <span>Accesorios</span> Destacados
+                  <Headphones size={20} aria-hidden="true" /> <span>Accesorios</span> Destacados
                 </h2>
                 <p style={{ 
                   margin: '4px 0 0 0', 
@@ -474,7 +768,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, 1fr)',
-              gap: isMobile ? '16px' : '24px',
+              gap: isMobile ? '12px' : '18px',
             }}>
               {accesoriosDestacados.slice(0, 3).map((product) => {
                 const isFav = !!favorites[product.id]
@@ -488,28 +782,28 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      padding: isMobile ? '16px' : '20px',
+                      padding: isMobile ? '12px' : '15px',
                       position: 'relative',
                       border: `1px solid ${PALETTE.aquaAccent}22`,
                     }}
                   >
-                    {/* Visor de Imagen */}
                     <div style={{
                       position: 'relative',
                       width: '100%',
-                      aspectRatio: '1.2 / 1',
+                      aspectRatio: '1.5 / 1',
                       background: PALETTE.bg,
                       borderRadius: '20px',
                       boxShadow: `inset 4px 4px 8px ${PALETTE.shadowDark}, inset -4px -4px 8px ${PALETTE.shadowLight}`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginBottom: '16px',
+                      marginBottom: '12px',
                       overflow: 'hidden',
                     }}>
                       <button
                         onClick={(e) => toggleFavorite(product.id, e)}
                         className="neu-btn-circle"
+                        aria-label={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                         style={{
                           position: 'absolute',
                           top: '10px',
@@ -520,7 +814,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                           zIndex: 3,
                         }}
                       >
-                        {isFav ? '❤️' : '🤍'}
+                        <Heart size={17} fill={isFav ? 'currentColor' : 'none'} aria-hidden="true" />
                       </button>
 
                       {product.badge && (
@@ -536,21 +830,21 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                       )}
 
                       {hasImage ? (
-                        <img
+                        <Image
                           src={product.image!}
                           alt={product.name}
                           className="product-image"
+                          fill
+                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                          unoptimized
                           onError={() => handleImageError(product.id)}
                           loading="lazy"
                         />
                       ) : (
-                        <span className={isMobile ? 'product-fallback-mobile' : 'product-fallback'}>
-                          {product.fallbackIcon || '🎧'}
-                        </span>
+                        <CategoryIcon category={product.category} size={isMobile ? 44 : 60} />
                       )}
                     </div>
 
-                    {/* Info del Producto */}
                     <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <span style={{
@@ -603,18 +897,22 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                         </div>
 
                         <Link href={`/admin/producto/${product.id}`}>
-                          <button className="neu-btn-circle" style={{
+                          <button className="neu-btn-circle" aria-label={`Editar ${product.name}`} style={{
                             width: '32px',
                             height: '32px',
-                            fontSize: '0.8rem',
                           }}>
-                            ✏️
+                            <Pencil size={16} aria-hidden="true" />
                           </button>
                         </Link>
                       </div>
 
-                      <button className="neu-buy-btn" style={{ padding: '10px', fontSize: '0.75rem' }}>
-                        🛒 COMPRAR
+                      <button
+                        className="neu-buy-btn"
+                        onClick={() => handleAddToCart(product)}
+                        aria-live="polite"
+                        style={{ padding: '9px', fontSize: '0.72rem' }}
+                      >
+                        <ShoppingCart size={15} aria-hidden="true" /> {recentlyAddedId === product.id ? 'AGREGADO' : 'AGREGAR AL CARRITO'}
                       </button>
                     </div>
                   </div>
@@ -622,7 +920,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
               })}
             </div>
 
-            {/* Ver más accesorios */}
+
             {accesoriosDestacados.length > 3 && (
               <div style={{ textAlign: 'center', marginTop: '20px' }}>
                 <button 
@@ -635,32 +933,15 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                     border: `1px solid ${PALETTE.aquaAccent}33`,
                   }}
                 >
-                  Ver todos los accesorios ({accesoriosDestacados.length}) →
+                  Ver todos los accesorios ({accesoriosDestacados.length}) <ArrowRight size={16} aria-hidden="true" />
                 </button>
               </div>
             )}
           </section>
         )}
 
-        {/* Buscador y Filtros */}
-        <section style={{ paddingBottom: '30px' }}>
-          <div style={{ marginBottom: isMobile ? '20px' : '30px', display: 'flex', justifyContent: 'center' }}>
-            <div className="neu-input-container" style={{ position: 'relative', width: '100%', maxWidth: '600px', display: 'flex', alignItems: 'center' }}>
-              <span style={{ paddingLeft: '20px', fontSize: '1.1rem', color: PALETTE.aquaAccent }}>🔍</span>
-              <input
-                type="text"
-                placeholder="Buscar por nombre de producto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="neu-input"
-                style={{
-                  padding: isMobile ? '14px 16px' : '16px 20px',
-                  fontSize: isMobile ? '0.85rem' : '0.95rem',
-                }}
-              />
-            </div>
-          </div>
 
+        <section id="productos" style={{ paddingBottom: '30px', scrollMarginTop: '24px' }}>
           <div
             className="no-scrollbar"
             style={{
@@ -679,7 +960,9 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                   key={filter.id}
                   onClick={() => setSelectedCategory(filter.id)}
                   className={`neu-pill ${isActive ? 'neu-pill-active' : ''}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
+                  {filter.id !== 'todos' && <CategoryIcon category={filter.id} size={16} />}
                   {filter.label}
                 </button>
               )
@@ -687,7 +970,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
           </div>
         </section>
 
-        {/* Grilla de Productos (todos) */}
+
         <section style={{ paddingBottom: '60px' }}>
           <div style={{
             display: 'flex',
@@ -701,7 +984,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
               margin: 0,
               color: PALETTE.textPrimary,
             }}>
-              {selectedCategory === 'accesorios' ? '🎧 Accesorios' : 'Línea de Equipamiento'}
+              {selectedCategory === 'accesorios' ? <><Headphones size={20} aria-hidden="true" /> Accesorios</> : 'Línea de Equipamiento'}
             </h3>
             <span className="neu-badge">
               {filteredProducts.length} DISPONIBLES
@@ -711,7 +994,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3, 1fr)',
-            gap: isMobile ? '20px' : '32px',
+            gap: isMobile ? '14px' : '22px',
           }}>
             {filteredProducts.map((product) => {
               const isFav = !!favorites[product.id]
@@ -725,30 +1008,30 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    padding: isMobile ? '18px' : '22px',
+                    padding: isMobile ? '13px' : '16px',
                     position: 'relative',
                     ...(product.category === 'accesorios' ? {
                       border: `1px solid ${PALETTE.aquaAccent}22`,
                     } : {}),
                   }}
                 >
-                  {/* Visor de Imagen */}
                   <div style={{
                     position: 'relative',
                     width: '100%',
-                    aspectRatio: '1.2 / 1',
+                    aspectRatio: '1.45 / 1',
                     background: PALETTE.bg,
                     borderRadius: '20px',
                     boxShadow: `inset 4px 4px 8px ${PALETTE.shadowDark}, inset -4px -4px 8px ${PALETTE.shadowLight}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '18px',
+                    marginBottom: '12px',
                     overflow: 'hidden',
                   }}>
                     <button
                       onClick={(e) => toggleFavorite(product.id, e)}
                       className="neu-btn-circle"
+                      aria-label={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                       style={{
                         position: 'absolute',
                         top: '10px',
@@ -759,7 +1042,7 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                         zIndex: 3,
                       }}
                     >
-                      {isFav ? '❤️' : '🤍'}
+                      <Heart size={17} fill={isFav ? 'currentColor' : 'none'} aria-hidden="true" />
                     </button>
 
                     {product.badge && (
@@ -775,20 +1058,20 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                     )}
 
                     {hasImage ? (
-                      <img
+                      <Image
                         src={product.image!}
                         alt={product.name}
                         className="product-image"
+                        fill
+                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                        unoptimized
                         onError={() => handleImageError(product.id)}
                         loading="lazy"
                       />
                     ) : (
-                      <span className={isMobile ? 'product-fallback-mobile' : 'product-fallback'}>
-                        {product.fallbackIcon || '📦'}
-                      </span>
+                      <CategoryIcon category={product.category} size={isMobile ? 44 : 60} />
                     )}
 
-                    {/* ✅ Badge de accesorio en la tarjeta */}
                     {product.category === 'accesorios' && (
                       <span style={{
                         position: 'absolute',
@@ -802,12 +1085,11 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                         borderRadius: '6px',
                         zIndex: 2,
                       }}>
-                        🎧 Accesorio
+                        <Headphones size={12} aria-hidden="true" /> Accesorio
                       </span>
                     )}
                   </div>
 
-                  {/* Info del Producto */}
                   <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <span style={{
@@ -829,10 +1111,10 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                     </div>
 
                     <h3 style={{
-                      fontSize: '0.95rem',
+                      fontSize: '0.9rem',
                       fontWeight: '700',
                       color: PALETTE.textPrimary,
-                      margin: '0 0 12px 0',
+                      margin: '0 0 8px 0',
                       lineHeight: '1.35',
                       height: '2.7em',
                       display: '-webkit-box',
@@ -860,18 +1142,22 @@ export default function CatalogClient({ products }: { products: Product[] }) {
                       </div>
 
                       <Link href={`/admin/producto/${product.id}`}>
-                        <button className="neu-btn-circle" style={{
+                        <button className="neu-btn-circle" aria-label={`Editar ${product.name}`} style={{
                           width: '36px',
                           height: '36px',
-                          fontSize: '0.85rem',
                         }}>
-                          ✏️
+                          <Pencil size={16} aria-hidden="true" />
                         </button>
                       </Link>
                     </div>
 
-                    <button className="neu-buy-btn">
-                      🛒 COMPRAR
+                    <button
+                      className="neu-buy-btn"
+                      onClick={() => handleAddToCart(product)}
+                      aria-live="polite"
+                      style={{ padding: '10px', fontSize: '0.75rem' }}
+                    >
+                      <ShoppingCart size={15} aria-hidden="true" /> {recentlyAddedId === product.id ? 'AGREGADO' : 'AGREGAR AL CARRITO'}
                     </button>
                   </div>
                 </div>

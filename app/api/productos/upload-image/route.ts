@@ -2,7 +2,6 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 
-// ✅ El bucket se llama 'productos'
 const BUCKET_NAME = 'productos'
 
 export async function POST(request: NextRequest) {
@@ -23,7 +22,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
         { error: 'El archivo debe ser una imagen' },
@@ -31,7 +29,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar tamaño (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json(
         { error: 'La imagen no puede superar los 5MB' },
@@ -39,17 +36,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generar nombre único
     const fileExt = file.name.split('.').pop()
     const fileName = `${productoId}-${uuidv4()}.${fileExt}`
     const filePath = `productos/${fileName}`
 
     console.log('📤 Guardando como:', filePath)
 
-    // Convertir a Buffer
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    // ✅ Usar el bucket 'productos'
     console.log('📤 Bucket:', BUCKET_NAME)
     
     const { data, error } = await supabaseAdmin.storage
@@ -70,7 +64,6 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Imagen subida:', data)
 
-    // Obtener URL pública
     const { data: urlData } = supabaseAdmin.storage
       .from(BUCKET_NAME)
       .getPublicUrl(filePath)

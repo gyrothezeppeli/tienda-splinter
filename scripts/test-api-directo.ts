@@ -4,7 +4,6 @@ async function main() {
   try {
     console.log('🔍 Probando acceso directo a la base de datos...\n')
     
-    // 1. Buscar el producto específico
     const id = 'e3487938-abf4-4121-bb8d-e9945d103e80'
     console.log('1️⃣ Buscando producto con ID:', id)
     
@@ -22,7 +21,6 @@ async function main() {
       console.log('❌ Producto NO encontrado')
     }
     
-    // 2. Listar todos los productos
     console.log('\n2️⃣ Listando todos los productos:')
     const todos = await prisma.producto.findMany()
     console.log(`Total: ${todos.length} productos`)
