@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📤 Bucket:', BUCKET_NAME)
     
+    const supabaseAdmin = getSupabaseAdmin()
     const { data, error } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
       .upload(filePath, buffer, {
